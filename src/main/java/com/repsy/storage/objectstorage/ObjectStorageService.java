@@ -23,3 +23,16 @@ public class ObjectStorageService implements StorageStrategy {
         if (content == null) {
             throw new RuntimeException("File not found: " + fileName + " in " + packageName + "/" + version);
         }
+        return content;
+    }
+
+    @Override
+    public boolean exists(String packageName, String version, String fileName) {
+        String key = getStorageKey(packageName, version, fileName);
+        return storage.containsKey(key);
+    }
+    
+    private String getStorageKey(String packageName, String version, String fileName) {
+        return packageName + "/" + version + "/" + fileName;
+    }
+} 
