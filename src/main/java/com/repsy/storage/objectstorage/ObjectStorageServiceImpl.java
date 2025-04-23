@@ -35,3 +35,39 @@ public class ObjectStorageServiceImpl implements StorageStrategy {
         this.minioClient = MinioClient.builder()
                 .endpoint(endpoint)
                 .credentials(accessKey, secretKey)
+                .build();
+        init();
+    }
+
+    public void init() {
+        try {
+            boolean bucketExists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
+            if (!bucketExists) {
+                minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
+                System.out.println("Created bucket: " + bucket);
+            }
+        } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
+            System.err.println("Could not initialize object storage: " + e.getMessage());
+            throw new RuntimeException("Could not initialize object storage", e);
+        }
+    }
+
+    @Override
+    public void store(String packageName, String version, String fileName, byte[] fileContent) {
+        try {
+            String objectName = getObjectName(packageName, version, fileName);
+            try (ByteArrayInputStream bais = new ByteArrayInputStream(fileContent)) {
+                minioClient.putObject(
+                        PutObjectArgs.builder()
+                                .bucket(bucket)
+                                .object(objectName)
+                                .stream(bais, fileContent.length, -1)
+                                .contentType("application/octet-stream")
+                                .build());
+                System.out.println("Stored file: " + fileName + " in " + packageName + "/" + version);
+            }
+        } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
+            System.err.println("Failed to store file: " + fileName + ": " + e.getMessage());
+            throw new RuntimeException("Failed to store file: " + fileName, e);
+        }
+    }
