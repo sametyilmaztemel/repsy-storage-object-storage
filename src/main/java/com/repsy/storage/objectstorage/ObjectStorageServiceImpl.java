@@ -71,3 +71,40 @@ public class ObjectStorageServiceImpl implements StorageStrategy {
             throw new RuntimeException("Failed to store file: " + fileName, e);
         }
     }
+
+    @Override
+    public byte[] load(String packageName, String version, String fileName) {
+        try {
+            String objectName = getObjectName(packageName, version, fileName);
+            try (InputStream stream = minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(objectName)
+                            .build())) {
+                return stream.readAllBytes();
+            }
+        } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
+            System.err.println("Failed to load file: " + fileName + ": " + e.getMessage());
+            throw new RuntimeException("Failed to load file: " + fileName, e);
+        }
+    }
+
+    @Override
+    public boolean exists(String packageName, String version, String fileName) {
+        try {
+            String objectName = getObjectName(packageName, version, fileName);
+            minioClient.statObject(
+                    StatObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(objectName)
+                            .build());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private String getObjectName(String packageName, String version, String fileName) {
+        return packageName + "/" + version + "/" + fileName;
+    }
+}
