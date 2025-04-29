@@ -53,3 +53,58 @@ public class ObjectStorageStrategy implements StorageStrategy {
             log.error("Could not initialize object storage", e);
             throw new RuntimeException("Could not initialize object storage", e);
         }
+    }
+
+    @Override
+    public void store(String packageName, String version, String fileName, byte[] fileContent) {
+        try {
+            String objectName = getObjectName(packageName, version, fileName);
+            try (ByteArrayInputStream bais = new ByteArrayInputStream(fileContent)) {
+                minioClient.putObject(
+                        PutObjectArgs.builder()
+                                .bucket(bucket)
+                                .object(objectName)
+                                .stream(bais, fileContent.length, -1)
+                                .contentType("application/octet-stream")
+                                .build());
+                log.info("Stored file: {} in {}/{}", fileName, packageName, version);
+            }
+        } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
+            log.error("Failed to store file: {}", fileName, e);
+            throw new RuntimeException("Failed to store file: " + fileName, e);
+        }
+    }
+
+    @Override
+    public byte[] load(String packageName, String version, String fileName) {
+        try {
+            String objectName = getObjectName(packageName, version, fileName);
+            try (InputStream stream = minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(objectName)
+                            .build())) {
+                return stream.readAllBytes();
+            }
+        } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
+            log.error("Failed to load file: {}", fileName, e);
+            throw new RuntimeException("Failed to load file: " + fileName, e);
+        }
+    }
+
+    @Override
+    public String store(MultipartFile file) {
+        try {
+            String fileName = UUID.randomUUID().toString();
+            try (InputStream inputStream = file.getInputStream()) {
+                minioClient.putObject(
+                        PutObjectArgs.builder()
+                                .bucket(bucket)
+                                .object(fileName)
+                                .stream(inputStream, file.getSize(), -1)
+                                .contentType(file.getContentType())
+                                .build());
+                log.info("Stored file: {}", fileName);
+                return fileName;
+            }
+        } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
