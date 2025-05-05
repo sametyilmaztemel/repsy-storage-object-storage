@@ -108,3 +108,58 @@ public class ObjectStorageStrategy implements StorageStrategy {
                 return fileName;
             }
         } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
+            log.error("Failed to store file", e);
+            throw new RuntimeException("Failed to store file", e);
+        }
+    }
+
+    @Override
+    public byte[] load(String filename) {
+        try {
+            try (InputStream stream = minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(filename)
+                            .build())) {
+                return stream.readAllBytes();
+            }
+        } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
+            log.error("Failed to load file: {}", filename, e);
+            throw new RuntimeException("Failed to load file: " + filename, e);
+        }
+    }
+
+    @Override
+    public void delete(String filename) {
+        try {
+            minioClient.removeObject(
+                    RemoveObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(filename)
+                            .build());
+            log.info("Deleted file: {}", filename);
+        } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
+            log.error("Failed to delete file: {}", filename, e);
+            throw new RuntimeException("Failed to delete file: " + filename, e);
+        }
+    }
+
+    @Override
+    public boolean exists(String packageName, String version, String fileName) {
+        try {
+            String objectName = getObjectName(packageName, version, fileName);
+            minioClient.statObject(
+                    StatObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(objectName)
+                            .build());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private String getObjectName(String packageName, String version, String fileName) {
+        return packageName + "/" + version + "/" + fileName;
+    }
+}
